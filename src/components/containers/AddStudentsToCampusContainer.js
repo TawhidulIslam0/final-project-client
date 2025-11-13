@@ -51,4 +51,5 @@ const mapDispatch = (dispatch) => ({
   editStudent: (student) => dispatch(editStudentThunk(student))
 });
 
+
 export default connect(mapState, mapDispatch)(AddStudentsToCampusContainer);
