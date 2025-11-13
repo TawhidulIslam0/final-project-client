@@ -1,45 +1,43 @@
-/*==================================================
-NewStudentContainer.js
-
-The Container component is responsible for stateful logic and data fetching, and
-passes data (if any) as props to the corresponding View component.
-If needed, it also defines the component's "connect" function.
-================================================== */
-import React from 'react'; 
-import { Component } from 'react';
+import React, { Component } from 'react';
 import { connect } from 'react-redux';
+import { fetchStudentThunk, editStudentThunk } from '../../store/thunks';
+import { EditStudentView } from '../views';
 import { Redirect } from 'react-router-dom';
-import Header from './Header';
-import NewStudentView from '../views/NewStudentView';
-import { addStudentThunk } from '../../store/thunks';
 
-class NewStudentContainer extends Component {
+class EditStudentContainer extends Component {
   constructor(props) {
     super(props);
-    // Get campusId from URL query parameters
-    const searchParams = new URLSearchParams(this.props.location.search);
-    const campusId = searchParams.get('campusId');
-    
     this.state = {
       firstname: "",
       lastname: "",
       email: "",
       imageUrl: "",
       gpa: "",
-      campusId: campusId || "", // Initialize with campusId from URL if it exists
+      campusId: "",
       errors: {
         firstname: "",
         lastname: "",
         email: "",
         gpa: "",
-        imageUrl: "",
-        campusId: "",
-        submit: ""
+        imageUrl: ""
       },
-      redirect: false,
-      redirectId: null,
-      redirectToCampus: !!campusId // New flag to handle redirect back to campus
+      redirect: false
     };
+  }
+
+  componentDidMount() {
+    // Get student ID from URL
+    this.props.fetchStudent(this.props.match.params.id).then(() => {
+      const { student } = this.props;
+      this.setState({
+        firstname: student.firstname,
+        lastname: student.lastname,
+        email: student.email,
+        imageUrl: student.imageUrl || "",
+        gpa: student.gpa || "",
+        campusId: student.campusId || ""
+      });
+    });
   }
 
   validateField = (name, value) => {
@@ -68,9 +66,10 @@ class NewStudentContainer extends Component {
       
       case "imageUrl":
         if (value) {
-          const urlRegex = /^https?:\/\/.+\..+/;
-          if (!urlRegex.test(value)) {
-            error = "Invalid URL format (must start with http:// or https://)";
+          try {
+            new URL(value);
+          } catch {
+            error = "Invalid URL format";
           }
         }
         break;
@@ -88,15 +87,14 @@ class NewStudentContainer extends Component {
       [name]: value,
       errors: {
         ...prevState.errors,
-        [name]: this.validateField(name, value),
-        submit: ""
+        [name]: this.validateField(name, value)
       }
     }));
   }
 
   handleSubmit = async event => {
     event.preventDefault();
-
+    
     // Validate all fields
     const errors = {
       firstname: this.validateField("firstname", this.state.firstname),
@@ -113,62 +111,52 @@ class NewStudentContainer extends Component {
     }
 
     try {
-      const student = {
+      await this.props.editStudent({
+        id: this.props.student.id,
         firstname: this.state.firstname,
         lastname: this.state.lastname,
         email: this.state.email,
         imageUrl: this.state.imageUrl || null,
         gpa: this.state.gpa ? parseFloat(this.state.gpa) : null,
         campusId: this.state.campusId ? parseInt(this.state.campusId) : null
-      };
-
-      const newStudent = await this.props.addStudent(student);
-
-      if (newStudent && newStudent.id) {
-        this.setState({
-          redirect: true,
-          redirectId: newStudent.id
-        });
-      } else {
-        throw new Error("Failed to add student");
-      }
+      });
+      
+      this.setState({ redirect: true });
     } catch (err) {
       console.error(err);
       this.setState(prevState => ({
         errors: {
           ...prevState.errors,
-          submit: "Failed to add student: " + (err.message || "Unknown error")
+          submit: "Failed to update student"
         }
       }));
     }
   }
 
   render() {
-    // Handle redirect based on whether we're adding to a campus or not
     if (this.state.redirect) {
-      if (this.state.redirectToCampus) {
-        return <Redirect to={`/campus/${this.state.campusId}`} />;
-      }
-      return <Redirect to={`/student/${this.state.redirectId}`} />;
+      return <Redirect to={`/student/${this.props.student.id}`} />;
     }
 
     return (
-      <div>
-        <Header />
-        <NewStudentView 
-          handleChange={this.handleChange}
-          handleSubmit={this.handleSubmit}
-          errors={this.state.errors}
-          campusId={this.state.campusId} // Pass campusId to view
-          redirectToCampus={this.state.redirectToCampus} // Pass redirect flag to view
-        />
-      </div>
+      <EditStudentView 
+        student={this.state.student}
+        handleChange={this.handleChange}
+        handleSubmit={this.handleSubmit}
+        formData={this.state}
+        errors={this.state.errors}
+      />
     );
   }
 }
 
-const mapDispatch = (dispatch) => ({
-  addStudent: (student) => dispatch(addStudentThunk(student))
+const mapState = (state) => ({
+  student: state.student
 });
 
-export default connect(null, mapDispatch)(NewStudentContainer);
+const mapDispatch = (dispatch) => ({
+  fetchStudent: (id) => dispatch(fetchStudentThunk(id)),
+  editStudent: (student) => dispatch(editStudentThunk(student))
+});
+
+export default connect(mapState, mapDispatch)(EditStudentContainer);

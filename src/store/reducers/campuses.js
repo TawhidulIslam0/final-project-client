@@ -12,7 +12,15 @@ const allCampuses = (state = [], action) => {  // Empty array as default Initial
   switch (action.type) {
     case at.FETCH_ALL_CAMPUSES:
       return action.payload;
-    default:
+    case at.EDIT_CAMPUS:
+      return state.map(campus => {
+        return (
+          campus.id === action.payload.id ? action.payload : campus
+        );
+      });
+    case at.DELETE_CAMPUS:
+      // Ensure action.payload is valid and matches the data structure
+      return state.filter((campus) => campus.id !== action.payload);  default:
       // If the Reducer doesn't recognize the Action Type, returns the previous (current) State unchanged.
       return state;
   }
